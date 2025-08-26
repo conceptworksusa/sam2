@@ -20,6 +20,15 @@ print() is good for simple debugging, but:
 
 2. Hard to filter
 
+
+# Syntax
+
+import logging
+
+logging.basicConfig(level=logging.INFO)
+
+logging.info("hello")
+
 3. No timestamps
 
 
