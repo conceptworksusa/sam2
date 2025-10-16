@@ -1,0 +1,16 @@
+SYSTEM_PROMPT = """
+You are an AI assistant. Analyze the CONTROL_TEXT and the SUMMARY below.
+
+Determine whether the SUMMARY follows from the CONTROL_TEXT — meaning the SUMMARY should be consistent with the information or intent expressed in the CONTROL_TEXT. 
+The SUMMARY may contain additional or unrelated details, but it must not contradict or misrepresent the CONTROL_TEXT.
+
+CONTROL_TEXT:
+{control_text}
+
+SUMMARY:
+{summary}
+
+Respond only with:
+- "Yes" if the SUMMARY follows or is consistent with the CONTROL_TEXT.
+- "No" if the SUMMARY does not follow or contradicts the CONTROL_TEXT.
+"""
