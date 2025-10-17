@@ -1,0 +1,68 @@
+import psycopg2
+from psycopg2.extras import RealDictCursor
+
+# ----------------------------
+# Database connection
+# ----------------------------
+conn = psycopg2.connect(
+    host="localhost",
+    user="your_user",
+    password="your_password",
+    dbname="your_database"
+)
+cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+# ----------------------------
+# Function: insert_or_list_statuses
+# ----------------------------
+def insert_or_list_statuses(doc_id, status_description):
+    """
+    Inserts a document into document_processing if the status_description exists.
+    If not, returns all available statuses from document_processing_decode.
+    """
+    query = """
+    WITH status_check AS (
+        SELECT status_id
+        FROM document_processing_decode
+        WHERE LOWER(status_description) = LOWER(%s)
+    ),
+    insert_doc AS (
+        INSERT INTO document_processing (doc_id, status)
+        SELECT %s, status_id
+        FROM status_check
+        RETURNING doc_id, status
+    )
+    SELECT * FROM insert_doc
+    UNION ALL
+    SELECT status_id AS doc_id, status_description AS status
+    FROM document_processing_decode
+    WHERE NOT EXISTS (SELECT 1 FROM insert_doc);
+    """
+
+    cursor.execute(query, (status_description, doc_id))
+    results = cursor.fetchall()
+
+    # Check if insertion happened
+    if results and isinstance(results[0]['doc_id'], int):
+        return {"inserted_doc": results[0]}
+    else:
+        return {"available_statuses": results}
+
+
+# ----------------------------
+# Example Usage
+# ----------------------------
+if __name__ == "__main__":
+    # Case 1: Status exists
+    result = insert_or_list_statuses(104, "Approved")
+    print("Result for existing status:")
+    print(result)
+
+    # Case 2: Status does NOT exist
+    result = insert_or_list_statuses(105, "Completed")
+    print("\nResult for non-existing status:")
+    print(result)
+
+    conn.commit()
+    cursor.close()
+    conn.close()
