@@ -1,0 +1,38 @@
+def upsert_document(doc_id, status_description):
+    query_upsert = """
+    WITH status_check AS (
+        SELECT status_id
+        FROM document_processing_decode
+        WHERE LOWER(status_description) = LOWER(%s)
+    )
+    INSERT INTO document_processing (doc_id, status)
+    SELECT %s, status_id
+    FROM status_check
+    ON CONFLICT (doc_id)
+    DO UPDATE SET status = EXCLUDED.status
+    RETURNING doc_id, status;
+    """
+
+    query_statuses = """
+    SELECT status_id, status_description
+    FROM document_processing_decode;
+    """
+
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+    try:
+        cursor.execute(query_upsert, (status_description, doc_id))
+        results = cursor.fetchall()
+
+        if results:
+            return {"upserted_doc": results[0]}
+        else:
+            cursor.execute(query_statuses)
+            statuses = cursor.fetchall()
+            return {"available_statuses": statuses}
+
+    finally:
+        conn.commit()
+        cursor.close()
+        conn.close()
