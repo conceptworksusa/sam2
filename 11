@@ -1,0 +1,78 @@
+import psycopg2
+from psycopg2.extras import RealDictCursor
+
+# ----------------------------
+# Database connection
+# ----------------------------
+def get_connection():
+    return psycopg2.connect(
+        host="localhost",
+        user="your_user",
+        password="your_password",
+        dbname="your_database"
+    )
+
+# ----------------------------
+# Function: upsert_document
+# ----------------------------
+def upsert_document(doc_id, status_description):
+    """
+    UPSERTs a document:
+    - Inserts a new row if doc_id does not exist.
+    - Updates the status if doc_id exists.
+    - If status_description does not exist, returns all available statuses.
+    """
+    query = """
+    WITH status_check AS (
+        SELECT status_id
+        FROM document_processing_decode
+        WHERE LOWER(status_description) = LOWER(%s)
+    ),
+    upsert_doc AS (
+        INSERT INTO document_processing (doc_id, status)
+        SELECT %s, status_id
+        FROM status_check
+        ON CONFLICT (doc_id)
+        DO UPDATE SET status = EXCLUDED.status
+        RETURNING doc_id, status
+    )
+    SELECT * FROM upsert_doc
+    UNION ALL
+    SELECT status_id AS doc_id, status_description AS status
+    FROM document_processing_decode
+    WHERE NOT EXISTS (SELECT 1 FROM upsert_doc);
+    """
+
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+    try:
+        cursor.execute(query, (status_description, doc_id))
+        results = cursor.fetchall()
+
+        # Check if UPSERT happened
+        if results and isinstance(results[0]['doc_id'], int):
+            return {"upserted_doc": results[0]}
+        else:
+            # Status description does not exist
+            return {"available_statuses": results}
+
+    finally:
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+
+# ----------------------------
+# Example Usage
+# ----------------------------
+if __name__ == "__main__":
+    # Example 1: Status exists → UPSERT happens
+    result = upsert_document(104, "Approved")
+    print("Example 1 result:")
+    print(result)
+
+    # Example 2: Status does NOT exist → returns available statuses
+    result = upsert_document(105, "Completed")
+    print("\nExample 2 result:")
+    print(result)
