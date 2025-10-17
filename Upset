@@ -1,0 +1,18 @@
+WITH status_check AS (
+    SELECT status_id
+    FROM document_processing_decode
+    WHERE LOWER(status_description) = LOWER('Approved')  -- input status_description
+),
+upsert_doc AS (
+    INSERT INTO document_processing (doc_id, status)
+    SELECT 104, status_id  -- input doc_id
+    FROM status_check
+    ON CONFLICT (doc_id)
+    DO UPDATE SET status = EXCLUDED.status
+    RETURNING doc_id, status
+)
+SELECT * FROM upsert_doc
+UNION ALL
+SELECT status_id AS doc_id, status_description AS status
+FROM document_processing_decode
+WHERE NOT EXISTS (SELECT 1 FROM upsert_doc);
